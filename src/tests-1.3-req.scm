@@ -54,6 +54,9 @@
    [($fxzero? 0) => "#t\n"]
    [($fxzero? 1) => "#f\n"]
    [($fxzero? -1) => "#f\n"]
+   [($fxzero? #t) => "#f\n"]
+   [($fxzero? #\a) => "#f\n"]
+   [($fxzero? ()) => "#f\n"]
 )
 
 (add-tests-with-string-output "null?"
