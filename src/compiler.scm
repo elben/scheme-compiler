@@ -13,11 +13,12 @@
 (define fx-mask  #x03)
 (define fx-tag   #x00)
 
-(define null   #x3F) ;; 0b0...00111111
+(define null   #x3F)    ;; 0b0...00111111
 
-(define bool-f #x2F) ;; 0b0...00101111
-(define bool-t #x6F) ;; 0b0...01101111
-(define bool-bit 6)  ;;        x <-- where bit differs between true/false.
+(define bool-mask #x3F) ;; 0b0...00111111
+(define bool-f #x2F)    ;; 0b0...00101111
+(define bool-t #x6F)    ;; 0b0...01101111
+(define bool-bit 6)     ;;        x <-- where bit differs between true/false.
 
 ;; Chars uses two bytes. Lower byte is 0b00001111. Upper byte is the ASCII
 ;; value. For example, #\a is ASCII value 97. So the value is:
@@ -32,6 +33,22 @@
 ;; Lower/upper bounds for fixnums
 (define fxlower (- (expt 2 (- fixnum-bits 1))))
 (define fxupper (sub1 (expt 2 (- fixnum-bits 1))))
+
+;;;;;;;;;;;;;;;;;;;;;;;
+;; X86 Registers Guide
+;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; http://www.eecg.toronto.edu/~amza/www.mindsec.com/files/x86regs.html
+;;
+;; %eax is the accumulator register.
+;; - ax, ah, al are ways to access this register.
+;; - ax - lower 16 bits
+;; - al - lower 6 bits
+;; - ah - bits 6 - 15
+
+;;;;;;;;;;;;;;;;;;;;;;;
+;; Compiler
+;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (fixnum? x)
   (and (integer? x) (exact? x) (<= fxlower x fxupper)))
@@ -99,22 +116,25 @@
   ;; two bits as 00b, which is the fixnum tag.
   (emit "    shrl $~s, %eax" (- char-shift fx-shift)))
 
-(define-primitive (fixnum? arg)
-  ;; Evaluate arg and put on %eax
-  (emit-expr arg)
-
-  ;; AND %eax with fx-mask, storing result in %al (argument register)
-  (emit "    and $~s, %al" fx-mask)
-
-  ;; Returns boolean (on %eax register). True if %al register equals to fx-tag.
-  ;; False otherwise.
-  (emit-bool-if-equal fx-tag))
-
 (define-primitive ($fxzero? arg)
   (emit-bool-if-equal arg 0))
 
 (define-primitive (null? arg)
   (emit-bool-if-equal arg null))
+
+(define-primitive (fixnum? arg)
+  (emit-check-tag fx-mask fx-tag arg))
+
+(define-primitive (boolean? arg)
+  (emit-check-tag bool-mask bool-f arg))
+
+(define-primitive (char? arg)
+  (emit-check-tag char-mask char-tag arg))
+
+;; TODO: returns #t if #f. Else returns #f
+(define-primitive (not arg)
+  ;; If equal to bool tag, XOR the differing value. Else, returns #f.
+  (emit-check-tag char-mask char-tag arg))
 
 (define (primitive? x)
   (and (symbol? x) (getprop x '*is-prim*)))
@@ -177,28 +197,55 @@
         ;; Compare result (in %al) with fx-tag.
         (emit "    cmp $~s, %al" val)
 
-        ;; If the compared values above were equal, sete will set the argument
-        ;; register (%al) 1. Otherwise, set to 0.
-        ;;
-        ;; A small glitch here is that the sete instruction only sets a 16-bit register.
-        ;; To work around this problem, we use the movzbl instruction that sign-extends
-        ;; the lower half of the register to the upper half. Since both 0 and 1 have 0 as
-        ;; their sign bit, the result of the extension is that the upper bits will be all
-        ;; zeros.
-        (emit "    sete %al")
-        (emit "    movzbl %al, %eax")
+        (emit-boolean))]))
 
-        ;; Shift left by bool-bit. bool-bit is where the bit differs between bool-f
-        ;; and bool-t.
-        ;;
-        ;; Then OR with bool-f so that %al turns into a boolean value,
-        ;; either bool-t or bool-f
-        ;;
-        ;; false: 0b00101111
-        ;; true:  0b01101111
-        ;;
-        (emit "    sal $~s, %al" bool-bit)
-        (emit "    or $~s, %al" bool-f))]))
+;; Emit boolean value into %eax. If %al is 1, emit bool-t. Else if $al is 0,
+;; emit bool-f.
+(define (emit-boolean)
+  ;; If the compared values above were equal, sete will set the argument
+  ;; register (%al) 1. Otherwise, set to 0.
+  ;;
+  ;; A small glitch here is that the sete instruction only sets a 16-bit register.
+  ;; To work around this problem, we use the movzbl instruction that sign-extends
+  ;; the lower half of the register to the upper half. Since both 0 and 1 have 0 as
+  ;; their sign bit, the result of the extension is that the upper bits will be all
+  ;; zeros.
+  (emit "    sete %al")
+  (emit "    movzbl %al, %eax")
+
+  ;; Shift left by bool-bit. bool-bit is where the bit differs between bool-f
+  ;; and bool-t.
+  ;;
+  ;; Then OR with bool-f so that %al turns into a boolean value,
+  ;; either bool-t or bool-f
+  ;;
+  ;; false: 0b00101111
+  ;; true:  0b01101111
+  ;;
+  (emit "    sal $~s, %al" bool-bit)
+  (emit "    or $~s, %al" bool-f))
+
+;; Checks if a value is tagged with tag, given a mask. Emits boolean value into
+;; %eax.
+;;
+;; If three arity, given value val is placed in %eax first.
+;; If two arity, assumes value is in %eax.
+;;
+(define emit-check-tag
+  (case-lambda
+    [(mask tag val)
+     (begin
+       ;; Put value in %eax return register.
+       (emit-expr val)
+       (emit-check-tag mask tag))]
+
+    [(mask tag)
+     (begin
+       ;; Mask %eax to get tag Put result in %eax.
+       (emit "    and $~s, %eax" mask)
+       ;; Returns boolean (on %eax register). True if %al register equals to tag.
+       ;; False otherwise.
+       (emit-bool-if-equal tag))]))
 
 (define (compile-program expr)
   ; (unless (immediate? expr) (error 'expr "expr has invalid type"))

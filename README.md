@@ -22,9 +22,20 @@ The binary produced by the compiler runs only on Linux. Tested on Ubuntu.
 
 # Using
 
-REPL not yet available.
+When in the Petite REPL, you can see the X86 output, given some Incremental Scheme:
 
-To compile an Incremental Scheme program...
+```
+(compile-program '(your program))
+
+(compile-program '($fxadd1 3))
+;     .text
+;     .globl scheme_entry
+;     .type scheme_entry, @function
+; scheme_entry:
+;     movl $12, %eax
+;     addl $4, %eax
+;     ret
+```
 
 # Development
 
