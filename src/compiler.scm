@@ -18,7 +18,9 @@
 (define bool-mask #x3F) ;; 0b0...00111111
 (define bool-f #x2F)    ;; 0b0...00101111
 (define bool-t #x6F)    ;; 0b0...01101111
+(define bool-tag bool-f)
 (define bool-bit 6)     ;;        x <-- where bit differs between true/false.
+(define bool-xor #x40)  ;; 0b0...01000000
 
 ;; Chars uses two bytes. Lower byte is 0b00001111. Upper byte is the ASCII
 ;; value. For example, #\a is ASCII value 97. So the value is:
@@ -45,6 +47,12 @@
 ;; - ax - lower 16 bits
 ;; - al - lower 6 bits
 ;; - ah - bits 6 - 15
+;;
+;; |63..32|31..16|15-8|7-0|
+;;                |AH.|AL.|
+;;                |AX.....|
+;;        |EAX............|
+;; |RAX...................|
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;; Compiler
@@ -131,10 +139,34 @@
 (define-primitive (char? arg)
   (emit-check-tag char-mask char-tag arg))
 
-;; TODO: returns #t if #f. Else returns #f
+;; TODO
+;; Returns opposite boolean if arg is a boolean. Returns #f is arg is not a
+;; boolean.
 (define-primitive (not arg)
   ;; If equal to bool tag, XOR the differing value. Else, returns #f.
-  (emit-check-tag char-mask char-tag arg))
+  (emit-expr arg)
+  (emit "    cmp $~s, %al" bool-f)
+  (emit-boolean)
+
+  ; (emit "    and $~s, %eax" bool-mask)
+  ; (emit "    cmp $~s, %al" bool-tag)
+  ; (emit "    jne NotBool")
+
+  ; ;; If bool tag, then return XOR of given value
+  ; (emit-boolean-val arg)
+  ; (emit "    xor $~s, %eax" bool-xor)
+  ; (emit "    ret")
+
+  ; ;; If not bool tag, jump here:
+  ; (emit "    NotBool:")
+  ; (emit-boolean-val #f)
+  ; (emit-boolean-val bool-f)
+
+  ;; If true, XOR the differing bit.
+  
+  ; (emit-check-tag char-mask bool-tag arg)
+  ;; Else, just return the false value
+  )
 
 (define (primitive? x)
   (and (symbol? x) (getprop x '*is-prim*)))
@@ -196,7 +228,6 @@
       (begin
         ;; Compare result (in %al) with fx-tag.
         (emit "    cmp $~s, %al" val)
-
         (emit-boolean))]))
 
 ;; Emit boolean value into %eax. If %al is 1, emit bool-t. Else if $al is 0,
@@ -224,6 +255,13 @@
   ;;
   (emit "    sal $~s, %al" bool-bit)
   (emit "    or $~s, %al" bool-f))
+
+;; Overwrite eax with given bool.
+(define (emit-boolean-val bool)
+  (emit "    and $0, %eax")
+  (if bool
+    (emit "    or $~s, %eax" bool-t)
+    (emit "    or $~s, %eax" bool-f)))
 
 ;; Checks if a value is tagged with tag, given a mask. Emits boolean value into
 ;; %eax.
