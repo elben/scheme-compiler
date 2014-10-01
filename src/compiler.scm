@@ -44,6 +44,9 @@
 ;; Compiler
 ;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (if? expr)
+  (and (= 4 (length expr)) (eq? (car expr) 'if)))
+
 (define (fixnum? x)
   (and (integer? x) (exact? x) (<= fxlower x fxupper)))
 
@@ -75,6 +78,7 @@
 (define (primitive-emitter x)
   (or (getprop x '*emitter*) (error 'foo "foo")))
 
+;; Is primitive function call?
 (define (primcall? expr)
   (and (pair? expr) (primitive? (car expr))))
 
@@ -98,7 +102,8 @@
 (define (emit-expr expr)
   (cond
     [(immediate? expr) (emit-immediate expr)]
-    [(primcall? expr) (emit-primcall expr)]
+    [(if? expr)        (emit-if expr)]
+    [(primcall? expr)  (emit-primcall expr)]
     [else (error 'expr "invalid expression; don't know what to do")]))
 
 (define (emit-function-header fn-header)
@@ -179,6 +184,40 @@
        ;; False otherwise.
        (emit-compare-bool tag))]))
 
+(define (if-test expr)
+  (cadr expr))
+
+(define (if-conseq expr)
+  (caddr expr))
+
+(define (if-altern expr)
+  (cadddr expr))
+
+(define (emit-if expr)
+  (let ([alt-label (unique-label)]
+        [end-label (unique-label)])
+    (emit-expr (if-test expr))
+    (emit "    cmp $~s, %al" bool-f)
+
+    ;; Jump to the alternative (else) branch if test expression was false.
+    (emit "    je ~a" alt-label)
+
+    ;; This is the consequence (then) branch.
+    (emit-expr (if-conseq expr))
+    (emit "    jmp ~a" end-label)
+
+    (emit "~a:" alt-label)
+    (emit-expr (if-altern expr))
+
+    (emit "~a:" end-label)))
+
+(define unique-label
+  (let ([count 0])
+    (lambda ()
+      (let ([L (format "L_~s" count)])
+        (set! count (add1 count))
+        L))))
+
 ;; Macro? that allows us to set properties in a symbol's property list.
 ;;
 ;; That is, the properties *is-prim*, *arg-count* and *emitter* are stored in the symbol
@@ -213,6 +252,12 @@
   (emit-expr arg)
   ;; Add 1 to fixnum. Actually adds 4, since fixnums tag is 0b11.
   (emit "    addl $~s, %eax" (immediate-rep 1)))
+
+(define-primitive (fxsub1 arg)
+  ;; Put arg on eax register
+  (emit-expr arg)
+  ;; Subtract 1 to fixnum. Actually subtracts 4, since fixnums tag is 0b11.
+  (emit "    addl $~s, %eax" (immediate-rep -1)))
 
 (define-primitive (fixnum->char arg)
   ;; Put arg on eax register
