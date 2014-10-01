@@ -102,13 +102,13 @@
        (putprop 'prim-name '*emitter*
          (lambda (arg* ...) b b* ...)))]))
 
-(define-primitive ($fxadd1 arg)
+(define-primitive (fxadd1 arg)
   ;; Put arg on eax register
   (emit-expr arg)
   ;; Add 1 to fixnum. Actually adds 4, since fixnums tag is 0b11.
   (emit "    addl $~s, %eax" (immediate-rep 1)))
 
-(define-primitive ($fixnum->char arg)
+(define-primitive (fixnum->char arg)
   ;; Put arg on eax register
   (emit-expr arg)
   ;; Left-shift fixnum to be in correct position for char, since lower bytes of
@@ -117,14 +117,14 @@
   ;; Tag lower bytes with char's tag.
   (emit "    orl $~s, %eax" char-tag))
 
-(define-primitive ($char->fixnum arg)
+(define-primitive (char->fixnum arg)
   ;; Put arg on %eax register
   (emit-expr arg)
   ;; Shift right to move char into fixnum position. This will leave the last
   ;; two bits as 00b, which is the fixnum tag.
   (emit "    shrl $~s, %eax" (- char-shift fx-shift)))
 
-(define-primitive ($fxzero? arg)
+(define-primitive (fxzero? arg)
   (emit-bool-if-equal arg 0))
 
 (define-primitive (null? arg)
