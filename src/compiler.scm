@@ -139,34 +139,14 @@
 (define-primitive (char? arg)
   (emit-check-tag char-mask char-tag arg))
 
-;; TODO
 ;; Returns opposite boolean if arg is a boolean. Returns #f is arg is not a
 ;; boolean.
 (define-primitive (not arg)
-  ;; If equal to bool tag, XOR the differing value. Else, returns #f.
   (emit-expr arg)
+  ;; `not` returns #t only when arg is #f, so just check for equality with
+  ;; bool-f.
   (emit "    cmp $~s, %al" bool-f)
-  (emit-boolean)
-
-  ; (emit "    and $~s, %eax" bool-mask)
-  ; (emit "    cmp $~s, %al" bool-tag)
-  ; (emit "    jne NotBool")
-
-  ; ;; If bool tag, then return XOR of given value
-  ; (emit-boolean-val arg)
-  ; (emit "    xor $~s, %eax" bool-xor)
-  ; (emit "    ret")
-
-  ; ;; If not bool tag, jump here:
-  ; (emit "    NotBool:")
-  ; (emit-boolean-val #f)
-  ; (emit-boolean-val bool-f)
-
-  ;; If true, XOR the differing bit.
-  
-  ; (emit-check-tag char-mask bool-tag arg)
-  ;; Else, just return the false value
-  )
+  (emit-boolean))
 
 (define (primitive? x)
   (and (symbol? x) (getprop x '*is-prim*)))
