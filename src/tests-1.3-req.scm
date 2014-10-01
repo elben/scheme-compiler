@@ -1,6 +1,3 @@
-
-
-
 (add-tests-with-string-output "fxadd1"
   [(fxadd1 0) => "1\n"]
   [(fxadd1 -1) => "0\n"]
@@ -108,6 +105,7 @@
   [(not (fixnum? #f)) => "#t\n"]
 )
 
+;; Fixnum logical not. Argument is treated as two's complement.
 (add-tests-with-string-output "fxlognot"
  [(fxlognot 0) => "-1\n"]
  [(fxlognot -1) => "0\n"]

@@ -148,6 +148,13 @@
   (emit "    cmp $~s, %al" bool-f)
   (emit-boolean))
 
+;; Fixnum logical not. Argument is treated as two's complement.
+(define-primitive (fxlognot arg)
+  (emit-expr arg)
+  (emit "    shrl $~s, %eax" fx-shift)  ;; left shift
+  (emit "    not %eax")                 ;; inverse all bits
+  (emit "    shll $~s, %eax" fx-shift)) ;; right shift
+
 (define (primitive? x)
   (and (symbol? x) (getprop x '*is-prim*)))
 
