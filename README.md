@@ -22,6 +22,25 @@ The binary produced by the compiler runs only on Linux. Tested on Ubuntu.
 
 # Using
 
+So far, only a subset of Scheme is implemented in Incremental Scheme. Here's an
+example program:
+
+```scheme
+(if
+  (and (null? ()) (fxzero? (fxadd1 -1)))
+  1
+  2)
+```
+
+To compile this program, evoke `inc`:
+
+```sh
+cd ~/code/scheme-compiler/src
+./inc myprogram.scm myprogram.out
+./myprogram.out
+# prints out "1"
+```
+
 When in the Petite REPL, you can see the X86 output, given some Incremental Scheme:
 
 ```

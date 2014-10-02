@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# Compiles an Incremental Scheme program.
+# Example:
+#
+# inc test.scm test.out
+
+petite --script inc.scm $1 $2

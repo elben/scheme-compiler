@@ -9,23 +9,22 @@
            '(test-name [expr string  output-string] ...)
             all-tests))]))
 
-(define (run-compile expr)
-  (let ([p (open-output-file "stst.s" 'replace)])
-    (compile-program expr p)
-    (close-output-port p)))
-
-(define (build)
-  (unless (zero? (system "gcc -o stst runtime.c stst.s"))
-    (error 'make "could not build target")))
+(define build
+  (case-lambda
+    [()
+     (build "stst.s" "stst")]
+    [(asm-file binary-file)
+     (unless (zero? (system (string-append "gcc -o " binary-file " runtime.c " asm-file)))
+       (error 'make "could not build target"))]))
 
 (define (execute)
   (unless (zero? (system "./stst > stst.out"))
     (error 'make "produced program exited abnormally")))
 
 
-(define (build-program expr)
-   (run-compile expr)
-   (build))
+(define (build-program expr asm-file binary-file)
+   (run-compile expr asm-file)
+   (build asm-file binary-file))
 
 (define (get-string)
   (with-output-to-string
@@ -99,11 +98,14 @@
 
 (define show-compiler-output (make-parameter #f))
 
-(define (run-compile expr)
-  (let ([p (open-output-file "stst.s" 'replace)])
-    (parameterize ([compile-port p])
-       (compile-program expr))
-    (close-output-port p)))
+(define run-compile
+  (case-lambda
+    [(expr) (run-compile expr "stst.s")]
+    [(expr asm-file)
+     (let ([p (open-output-file asm-file 'replace)])
+       (parameterize ([compile-port p])
+                     (compile-program expr))
+       (close-output-port p))]))
 
 
 (define (execute)
