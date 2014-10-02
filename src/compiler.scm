@@ -44,9 +44,6 @@
 ;; Compiler
 ;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (if? expr)
-  (and (= 4 (length expr)) (eq? (car expr) 'if)))
-
 (define (fixnum? x)
   (and (integer? x) (exact? x) (<= fxlower x fxupper)))
 
@@ -82,13 +79,22 @@
 (define (primcall? expr)
   (and (pair? expr) (primitive? (car expr))))
 
-;; Emits immediate constants into return register %eax.
-(define (emit-immediate expr)
-  (emit "    movl $~s, %eax" (immediate-rep expr)))
-
 ;; TODO
 (define (check-primcall-args primitive-fn args)
   #t)
+
+(define (if? expr)
+  (and (= 4 (length expr)) (eq? (car expr) 'if)))
+
+(define (and? expr)
+  (and (list? expr) (eq? (car expr) 'and)))
+
+(define (or? expr)
+  (and (list? expr) (eq? (car expr) 'or)))
+
+;; Emits immediate constants into return register %eax.
+(define (emit-immediate expr)
+  (emit "    movl $~s, %eax" (immediate-rep expr)))
 
 ;; Emits primitive method call. e.g. (boolean? x).
 (define (emit-primcall expr)
@@ -103,6 +109,8 @@
   (cond
     [(immediate? expr) (emit-immediate expr)]
     [(if? expr)        (emit-if expr)]
+    [(and? expr)       (emit-and expr)]
+    [(or? expr)        (emit-or expr)]
     [(primcall? expr)  (emit-primcall expr)]
     [else (error 'expr "invalid expression; don't know what to do")]))
 
@@ -210,6 +218,36 @@
     (emit-expr (if-altern expr))
 
     (emit "~a:" end-label)))
+
+(define (emit-and expr)
+  (let ([len (length expr)])
+    (cond
+      ;; (and) => #t
+      [(= 1 len) (emit-expr #t)]
+
+      ;; (and x) => x
+      [(= 2 len) (emit-expr (cadr expr))]
+
+      ;; Convert (and a b c) to (if a (and b c) #f)
+      ;;
+      ;; ` is to quasiquote the list
+      ;; ,@ is to splice the result of (cddr expr) into the body
+      [else (emit-if (list 'if (cadr expr) `(and ,@(cddr expr)) #f))])))
+
+(define (emit-or expr)
+  (let ([len (length expr)])
+    (cond
+      ;; (or) => #t
+      [(= 1 len) (emit-expr #t)]
+
+      ;; (or x) => x
+      [(= 2 len) (emit-expr (cadr expr))]
+
+      ;; Convert (or a b c) to (if a a (or b c))
+      ;;
+      ;; ` is to quasiquote the list
+      ;; ,@ is to splice the result of (cddr expr) into the body
+      [else (emit-if (list 'if (cadr expr) (cadr expr) `(or ,@(cddr expr))))])))
 
 (define unique-label
   (let ([count 0])

@@ -25,9 +25,7 @@ The binary produced by the compiler runs only on Linux. Tested on Ubuntu.
 When in the Petite REPL, you can see the X86 output, given some Incremental Scheme:
 
 ```
-(compile-program '(your program))
-
-(compile-program '($fxadd1 3))
+(compile-program '(fxadd1 3))
 ;     .text
 ;     .globl scheme_entry
 ;     .type scheme_entry, @function
